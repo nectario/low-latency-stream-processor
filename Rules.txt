@@ -1,0 +1,30 @@
+Rules:
+
+&nbsp;
+
+1. The code needs to be clean and easily readable/maintained (following design principals of their choice).
+
+2. Code needs to have suitable automated testing (unit testing etc).
+
+3. Code needs to be at a standard they would put their “stamp of approval” on and would be happy with peers reviewing.
+
+4. App can use open-source packages along with own coding.
+
+
+Rules:
+
+&nbsp;
+
+• Goal #1
+
+Build a Java app that, at its most basic, consumes an inbound real-time stream of data , is able to perform some processing on it, and then pass the data back out to another receiving stream.
+
+
+• Goal #2
+
+The app needs to handle that it can handle 20,000 messages per second, performing some transformation on the inbound data, to produce a different data structure on the outbound stream.
+
+
+• Goal #3
+
+The app needs to produce metrics from line handling and transformation latencies from data arrival, through processing, to delivery to outbound stream.
