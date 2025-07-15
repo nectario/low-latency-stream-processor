@@ -1,27 +1,33 @@
 package com.ubs.trading.core;
 
-/** Pre‑allocated Disruptor event. */
-public final class EventEnvelope {
+/**
+ * Pre‑allocated event wrapper used by the Disruptor ring buffer.
+ *
+ * @param <T> the payload type carried through the pipeline
+ */
+public final class EventEnvelope<T> {
 
-  private String message; // ← renamed
-  private long ingestNanos;
+    private T    payload;
+    private long ingestNanos;
 
-  /* package‑private mutator */
-  void set(String message, long ingestNanos) {
-    this.message = message;
-    this.ingestNanos = ingestNanos;
-  }
+    /* package‑private mutator: set both fields in one go */
+    void set(T payload, long ingestNanos) {
+        this.payload     = payload;
+        this.ingestNanos = ingestNanos;
+    }
 
-  /* getters */
-  public String getMessage() {
-    return message;
-  }
+    /* getters */
 
-  public long getIngestNanos() {
-    return ingestNanos;
-  }
+    public T getPayload() {
+        return payload;
+    }
 
-  void clear() {
-    message = null;
-  }
+    public long getIngestNanos() {
+        return ingestNanos;
+    }
+
+    /* Clear references so the object can be safely reused by the ring buffer */
+    void clear() {
+        payload = null;
+    }
 }

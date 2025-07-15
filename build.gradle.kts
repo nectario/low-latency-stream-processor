@@ -44,6 +44,9 @@ dependencies {
     // --- unit & integration test helpers ---
     testImplementation("org.mockito:mockito-core:5.10.0")
     testImplementation("org.awaitility:awaitility:4.2.0")
+
+    testImplementation("org.quickfixj:quickfixj-core:2.3.2")
+    testImplementation("org.slf4j:slf4j-simple:1.6.1")
 }
 
 tasks.test {

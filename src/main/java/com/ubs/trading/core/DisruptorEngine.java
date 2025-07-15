@@ -1,45 +1,63 @@
 package com.ubs.trading.core;
 
 import com.lmax.disruptor.*;
-import com.lmax.disruptor.BlockingWaitStrategy;
 import com.lmax.disruptor.dsl.Disruptor;
 import com.lmax.disruptor.dsl.ProducerType;
 import com.ubs.trading.metrics.MetricsRecorder;
+
 import java.util.concurrent.Executors;
 
-public final class DisruptorEngine {
+/**
+ * Generic Disruptor wrapper:
+ *
+ *   • {@code T} is the payload type carried by {@code EventEnvelope<T>}.
+ *   • Publishes events in a type-safe way, no raw casts.
+ */
+public final class DisruptorEngine<T> {
 
-  private final Disruptor<EventEnvelope> disruptor;
-  private final RingBuffer<EventEnvelope> ring;
-  private final MetricsRecorder metrics;
+    private final Disruptor<EventEnvelope<T>> disruptor;
+    private final RingBuffer<EventEnvelope<T>> ring;
+    private final MetricsRecorder metrics;
 
-  /* ---------- translator eliminates the raw/unchecked call ---------- */
-  private static final EventTranslatorTwoArg<EventEnvelope, String, Long> TRANSLATOR =
-      (evt, seq, msg, ts) -> evt.set(msg, ts);
+    /** Re-usable translator eliminates unchecked calls. */
 
-  public DisruptorEngine(
-      int ringSize, EventHandler<EventEnvelope> handler, MetricsRecorder metrics) {
+    private final class Translator implements EventTranslatorTwoArg<EventEnvelope<T>, T, Long> {
 
-    this.metrics = metrics;
+        @Override
+        public void translateTo(EventEnvelope<T> evt, long seq, T msg, Long ts) {
+            evt.set(msg, ts);
+        }
+    }
 
-    disruptor =
-        new Disruptor<>(
-            EventEnvelope::new,
-            ringSize,
-            Executors.defaultThreadFactory(),
-            ProducerType.SINGLE,
-            new BlockingWaitStrategy());
+    private final EventTranslatorTwoArg<EventEnvelope<T>, T, Long> translator = new Translator();
 
-    disruptor.handleEventsWith(handler);
-    ring = disruptor.start();
-  }
 
-  public void publish(String message) {
-    long t0 = metrics.markIngest();
-    ring.publishEvent(TRANSLATOR, message, t0); // no unchecked conversion
-  }
+    /* ------------------------------------------------------------- */
 
-  public void shutdown() {
-    disruptor.shutdown();
-  }
+    public DisruptorEngine(int ringSize,
+                           EventHandler<EventEnvelope<T>> handler,
+                           MetricsRecorder metrics) {
+
+        this.metrics = metrics;
+
+        disruptor = new Disruptor<>(
+                EventEnvelope::new,           // factory supplies generic envelope
+                ringSize,
+                Executors.defaultThreadFactory(),
+                ProducerType.SINGLE,
+                new BlockingWaitStrategy());
+
+        disruptor.handleEventsWith(handler);
+        ring = disruptor.start();
+    }
+
+    /** Publish a payload of type {@code T}. */
+    public void publish(T message) {
+        long t0 = metrics.markIngest();
+        ring.publishEvent(translator, message, t0);
+    }
+
+    public void shutdown() {
+        disruptor.shutdown();
+    }
 }

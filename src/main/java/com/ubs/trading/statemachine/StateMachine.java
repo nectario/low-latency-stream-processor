@@ -1,61 +1,44 @@
 package com.ubs.trading.statemachine;
 
 import com.ubs.trading.pipeline.Pipeline;
+
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Generic, thread‑safe state machine whose <em>action</em> is a {@link Pipeline}.
+ * Table‑driven state machine whose transitions return a Pipeline&lt;T&gt;.
  *
- * <p>Each transition is defined by: <code>(currentState, event) -> nextState, pipeline</code>
- *
- * @param <S> the State type (enum or String recommended)
- * @param <E> the Event type (enum or String recommended)
+ * @param <S> state   type (enum or String recommended)
+ * @param <E> event type *and* payload type flowing through the pipeline
  */
 public final class StateMachine<S, E> {
 
-  /** Immutable transition record. */
-  public static record Transition<S>(S nextState, Pipeline<String> pipeline) {}
+    public static record Transition<S, T>(S nextState, Pipeline<T> pipeline) {}
 
-  private final Map<S, Map<E, Transition<S>>> table = new ConcurrentHashMap<>();
-  private volatile S current;
+    private final Map<S, Map<E, Transition<S, E>>> table = new ConcurrentHashMap<>();
+    private volatile S current;
 
-  public StateMachine(S initialState) {
-    this.current = initialState;
-  }
+    public StateMachine(S initialState) { this.current = initialState; }
 
-  /* ------------------------------------------------------------------ *
-   *  Builder API
-   * ------------------------------------------------------------------ */
+    /* builder --------------------------------------------------------- */
 
-  public StateMachine<S, E> add(S from, E event, S to, Pipeline<String> pipeline) {
-    table
-        .computeIfAbsent(from, k -> new ConcurrentHashMap<>())
-        .put(event, new Transition<>(to, pipeline));
-    return this;
-  }
+    public StateMachine<S, E> add(S from, E event, S to, Pipeline<E> pipeline) {
+        table.computeIfAbsent(from, k -> new ConcurrentHashMap<>())
+                .put(event, new Transition<>(to, pipeline));
+        return this;
+    }
 
-  /* ------------------------------------------------------------------ *
-   *  Runtime API
-   * ------------------------------------------------------------------ */
+    /* runtime --------------------------------------------------------- */
 
-  /**
-   * Fires an event, returns the pipeline associated with the transition, and mutates the current
-   * state.
-   *
-   * @throws IllegalStateException if no transition is defined.
-   */
-  public Pipeline<String> onEvent(E event) {
-    Map<E, Transition<S>> row = table.get(current);
-    if (row == null || !row.containsKey(event))
-      throw new IllegalStateException("No transition for %s / %s".formatted(current, event));
+    public Pipeline<E> onEvent(E event) {
+        Map<E, Transition<S, E>> row = table.get(current);
+        if (row == null || !row.containsKey(event))
+            throw new IllegalStateException("No transition for %s / %s".formatted(current, event));
 
-    Transition<S> t = row.get(event);
-    current = t.nextState();
-    return t.pipeline();
-  }
+        Transition<S, E> t = row.get(event);
+        current = t.nextState();
+        return t.pipeline();
+    }
 
-  public S state() {
-    return current;
-  }
+    public S state() { return current; }
 }
