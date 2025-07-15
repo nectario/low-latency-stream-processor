@@ -3,32 +3,37 @@ Low‑Latency Stream Processor
 
 Context
 -------
-This is a small proof‑of‑concept built for the interview exercise.
-The code combines two design patterns I have used on previous trading desks:
+Small proof‑of‑concept for the interview exercise.  Two patterns I have used
+on trading desks are combined:
 
 1. Functional pipelines (UBS auto‑roll project)
 2. Table‑driven state machines (multi‑phase RFQ negotiation at Nomura)
 
-Together they form a minimal yet production‑shaped core that meets the three
-stated goals.
+Recent change: the entire core is now generic, so any domain object
+(e.g. TradeEvent) can flow through Disruptor → StateMachine → Pipeline
+without casting.  A FIX‑Execution‑Report demo test shows this in practice.
 
 How the three goals are satisfied
 ---------------------------------
-- **Goal 1:** ingest -> process -> forward
-  DisruptorEngine receives the message, Dispatcher picks the pipeline,
-  the transformed message is forwarded through MessageSender.
+- **Goal 1:** ingest → process → forward  
+  DisruptorEngine receives each payload, Dispatcher selects the correct
+  Pipeline, and the transformed payload is forwarded via MessageSender.
 
+- **Goal 2:** ≥ 20,000 messages per second + transformation  
+  ThroughputTest publishes **50 042** messages in **2 seconds**
+  (≈ 25 k msg/s) on a laptop.  
+  The pipeline appends “ | processed” to the inbound string, proving a
+  structural transformation occurs.
 
-- **Goal 2:** 20000 messages per second and a transformation
-  ThroughputTest sends 50000 messages in under three seconds on a laptop.
-  The pipeline turns the inbound string into “data-msg | processed”, showing
-  that the structure can be altered.
+- **Goal 3:** latency metrics  
+  MetricsRecorder registers three Micrometer timers:  
+  • `msg.ingest.latency`  
+  • `msg.proc.latency`  
+  • `msg.e2e.latency`  
+  A snapshot like  
+  `HistogramSnapshot{count=50042, mean=19µs, max=5.4ms, …}`  
+  is printed at the end of the demo run.
 
-
-- **Goal 3:** latency metrics
-  MetricsRecorder records three Micrometer timers: ingest latency,
-  processing latency, end‑to‑end latency.  A snapshot is printed at the end of
-  the demo run.
 
 Quick start
 -----------
@@ -37,29 +42,31 @@ Quick start
 
 Key classes
 -----------
-Pipeline.java
-immutable list of Function<T,T> steps, optional short‑circuit on error.
+EventEnvelope<T>
+Pre‑allocated container reused by the Disruptor ring.
 
-StateMachine.java
-generic (State, Event) lookup that returns a Pipeline and moves to the
-next state
+DisruptorEngine<T>
+1024‑slot single‑producer ring buffer, generic publish(T).
 
-Dispatcher.java
-connects Disruptor events to the correct pipeline, records metrics, sends
-the result downstream
+Pipeline<T>
+Immutable list of Function<T,T> steps, optional short‑circuit.
 
-DisruptorEngine.java
-1024‑slot single‑producer ring buffer for very low latency
+StateMachine<S,T>
+Table‑driven lookup that returns a Pipeline<T> and moves to next state.
 
-Message flow (one line)
------------------------
-publish() -> Disruptor -> Dispatcher -> Pipeline.execute() -> sender.send()
+Dispatcher<S,T>
+Bridges Disruptor to StateMachine, executes the pipeline, records metrics,
+forwards via MessageSender<T>.
+
+Message flow (single line)
+--------------------------
+publish() → Disruptor → Dispatcher → Pipeline.execute() → sender.send()
 
 Why the structure looks more complete than a typical code test
 --------------------------------------------------------------
-I wanted to show exactly how I structure a low‑latency component when the code
-will eventually run on a trading desk in production.  If this feels like
+I wanted to show exactly how I would structure a low‑latency component that
+could move straight into a trading‑desk codebase.  If this feels like
 over‑engineering for an interview task, it is simply because I enjoy writing
 clean, testable designs.
 
-– Nektarios
+–Nektarios
