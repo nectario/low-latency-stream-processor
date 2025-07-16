@@ -16,7 +16,7 @@ import java.util.concurrent.atomic.AtomicLong;
  *   • single‑type pipelines
  *   • table‑driven state machine
  *   • generic Disruptor engine with latency metrics
- *   • synthetic load ≈ 25 k msg/s
+ *   • synthetic load ≈25kmsg/s
  */
 public final class Main {
 
@@ -80,15 +80,15 @@ public final class Main {
         DisruptorEngine<String> engine =
                 new DisruptorEngine<>(1_024, dispatcher, m);
 
-        /* 3.4  Synthetic load (≈25 k msg/s) */
+        /* 3.4  Synthetic load (≈25kmsg/s) */
         engine.publish("HELLO");                    // handshake → ACTIVE
 
         ScheduledExecutorService exec = Executors.newSingleThreadScheduledExecutor();
         Runnable pub = () -> engine.publish("DATA");
 
-        exec.scheduleAtFixedRate(pub, 0, 40_000, TimeUnit.NANOSECONDS); // 40 µs
+        exec.scheduleAtFixedRate(pub, 0, 40_000, TimeUnit.NANOSECONDS); // 40µs
 
-        Thread.sleep(2_000);                       // run 2 seconds
+        Thread.sleep(2_000);                       // run 2seconds
         exec.shutdownNow();
         engine.shutdown();
 
